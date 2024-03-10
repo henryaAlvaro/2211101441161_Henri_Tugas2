@@ -2,18 +2,28 @@ import 'dart:convert';
 
 class Document {
   final Map<String, Object?> _json;
-
   Document() : _json = jsonDecode(documentJson);
 
-  Map<String, dynamic> get metadata {
-    return _json['metadata'] as Map<String, dynamic>;
+  (String, {DateTime modified}) getMetadata() {
+    if (_json.containsKey('metadata')) {
+      var metadataJson = _json['metadata'];
+      if (metadataJson is Map) {
+        var title = metadataJson['title'] as String;
+        var localModified = DateTime.parse(metadataJson['modified'] as String);
+        return (title, modified: localModified);
+      }
+    }
+    throw const FormatException('Unexpected JSON');
   }
 
-  String getMetadata() {
-    var title = metadata['title'] as String;
-    var modified = DateTime.parse(metadata['modified'] as String);
-
-    return 'Title: $title, Modified: $modified';
+  List<Block> getBlocks() {
+    if (_json case {'blocks': List blocksJson}) {
+      return <Block>[
+        for (var blockJson in blocksJson) Block.fromJson(blockJson)
+      ];
+    } else {
+      throw const FormatException('Unexpected JSON format');
+    }
   }
 }
 
@@ -34,14 +44,46 @@ const documentJson = '''
     },
     {
       "type": "checkbox",
-      "checked": false,
+      "checked": true,
       "text": "Learn Dart 3"
     }
   ]
 }
 ''';
 
-void main() {
-  var doc = Document();
-  print(doc.getMetadata());
+(String, {DateTime modified}) getMetadata() {
+  var title = "My Document";
+  var now = DateTime.now();
+
+  return (title, modified: now);
+}
+
+sealed class Block {
+  Block();
+
+  factory Block.fromJson(Map<String, Object?> json) {
+    return switch (json) {
+      {'type': 'h1', 'text': String text} => HeaderBlock(text),
+      {'type': 'p', 'text': String text} => ParagraphBlock(text),
+      {'type': 'checkbox', 'text': String text, 'checked': bool checked} =>
+        CheckboxBlock(text, checked),
+      _ => throw const FormatException('Unexpected JSON format'),
+    };
+  }
+}
+
+class HeaderBlock extends Block {
+  final String text;
+  HeaderBlock(this.text);
+}
+
+class ParagraphBlock extends Block {
+  final String text;
+  ParagraphBlock(this.text);
+}
+
+class CheckboxBlock extends Block {
+  final String text;
+  final bool isChecked;
+  CheckboxBlock(this.text, this.isChecked);
 }
